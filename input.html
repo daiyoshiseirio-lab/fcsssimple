@@ -37,6 +37,36 @@
   }
   header .title { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
   header .count { font-size: 12px; opacity: 0.75; }
+  #addressBar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  #addressBar input {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  #addressBar button {
+    padding: 8px 14px;
+    font-size: 14px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #addressBar button:disabled {
+    background: #999;
+  }
   #map {
     flex: 1;
     min-height: 0;
@@ -241,6 +271,11 @@
   <div class="count"><span id="markerCount">0</span> 件登録</div>
 </header>
 
+<div id="addressBar">
+  <input type="text" id="addressInput" placeholder="住所を入力して地図を移動">
+  <button id="addressSearchBtn">検索</button>
+</div>
+
 <div id="map"></div>
 
 <div id="toolbar">
@@ -359,6 +394,66 @@ tileLayer.on('tileerror', () => {
     }).addTo(map);
     showToast('国土地理院の地図が読み込めないため、別の地図に切り替えました');
   }
+});
+
+// ---------- Address search ----------
+async function searchAddress() {
+
+    const input = document.getElementById('addressInput');
+    const btn = document.getElementById('addressSearchBtn');
+    const address = input.value.trim();
+
+    if (address === '') {
+        showToast('住所を入力してください');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = '検索中...';
+
+    try {
+
+        const url = 'https://msearch.gsi.go.jp/address-search/AddressSearch?q='
+            + encodeURIComponent(address);
+
+        const res = await fetch(url);
+        const json = await res.json();
+
+        if (!json || json.length === 0) {
+            showToast('住所が見つかりませんでした');
+            return;
+        }
+
+        const lng = json[0].geometry.coordinates[0];
+        const lat = json[0].geometry.coordinates[1];
+
+        map.setView([lat, lng], 18);
+
+        showToast('地図を移動しました。正確な位置をタップして登録してください');
+
+    } catch (e) {
+
+        console.error(e);
+        showToast('検索に失敗しました');
+
+    } finally {
+
+        btn.disabled = false;
+        btn.innerText = '検索';
+
+    }
+
+}
+
+document.getElementById('addressSearchBtn').addEventListener('click', searchAddress);
+
+document.getElementById('addressInput').addEventListener('keydown', function (e) {
+
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        searchAddress();
+    }
+
 });
 
 // ---------- Locate ("現在地") control ----------
