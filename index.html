@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>近隣消火栓検索 FCSS-Simple</title>
+
+<link rel="stylesheet" href="style.css?v=1">
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+</head>
+
+<body>
+
+<header>
+
+<h1>🚒 近隣消火栓検索</h1>
+
+<p>火災発生場所から近い水利を自動選定</p>
+
+</header>
+
+<div class="container">
+
+<div class="card">
+
+<h2>火災情報</h2>
+
+<label>
+
+火災住所
+
+</label>
+
+<input
+type="text"
+id="address"
+placeholder="住所を入力してください">
+
+<label>
+
+表示件数
+
+</label>
+
+<select id="topN">
+
+<option value="3">3件</option>
+
+<option value="5" selected>5件</option>
+
+<option value="8">8件</option>
+
+<option value="10">10件</option>
+
+</select>
+
+<button id="searchButton">検索</button>
+
+</div>
+
+<div class="card">
+
+<h2>地図</h2>
+
+<div id="map"></div>
+
+</div>
+
+<div class="card">
+
+<h2>近隣水利一覧</h2>
+
+<div id="resultList">
+
+住所を入力してください
+
+</div>
+
+</div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="suiri.js?v=1"></script>
+<script src="planner.js?v=1"></script>
+<script src="app.js?v=1"></script>
+
+</body>
+</html>
