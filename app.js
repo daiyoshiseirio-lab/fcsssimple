@@ -6,7 +6,8 @@
 
 let map;
 let fireMarker;
-let waterLayer;
+let allWaterLayer;
+let highlightLayer;
 
 window.onload = function () {
 
@@ -40,6 +41,10 @@ window.onload = function () {
 
         enableMapClick();
 
+        /* 登録されている全水利を常時表示する */
+
+        drawAllWater();
+
         applyUrlParams();
 
     });
@@ -66,7 +71,8 @@ function initMap() {
 
     ).addTo(map);
 
-    waterLayer = L.layerGroup().addTo(map);
+    allWaterLayer = L.layerGroup().addTo(map);
+    highlightLayer = L.layerGroup().addTo(map);
 
 }
 
@@ -218,50 +224,164 @@ function runSearch(lat, lng) {
 
     const nearest = all.slice(0, topN);
 
-    drawResults(nearest);
+    drawHighlight(nearest);
 
     renderList(nearest);
 
 }
 
-function drawResults(list) {
+/* ==========================================================
+   ラベル文字列（口径・番号・T/P/K）
+========================================================== */
 
-    waterLayer.clearLayers();
+function waterLabelParts(w) {
+
+    const parts = [];
+
+    if (w.id) parts.push(w.id);
+
+    const isTank = (w.type === "防火水槽");
+
+    if (w.diameter && !isTank && Number(w.diameter) > 0) {
+
+        parts.push(w.diameter + "mm");
+
+    }
+
+    if (w.capacity && isTank && Number(w.capacity) > 0) {
+
+        parts.push(w.capacity + "t");
+
+    }
+
+    if (w.class) parts.push(w.class);
+
+    return parts;
+
+}
+
+function waterLabelText(w) {
+
+    return waterLabelParts(w).join(" / ");
+
+}
+
+/* ==========================================================
+   登録されている全水利を常時表示
+   （口径・番号・T/P/Kを常時ラベル表示。小さめのアイコン）
+========================================================== */
+
+function drawAllWater() {
+
+    allWaterLayer.clearLayers();
+
+    SUIRI.forEach(function (w) {
+
+        const isTank = (w.type === "防火水槽");
+
+        const color = isTank ? "#2e7d32" : (w.class === "K" ? "#9e9e9e" : "#1976d2");
+
+        const letter = isTank ? "水" : (w.class || "?");
+
+        const icon = L.divIcon({
+
+            className: "",
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+
+            html:
+                "<div style='"
+                + "width:20px;height:20px;border-radius:50%;"
+                + "background:" + color + ";"
+                + "border:2px solid white;"
+                + "box-shadow:0 0 3px rgba(0,0,0,.6);"
+                + "display:flex;align-items:center;justify-content:center;"
+                + "color:white;font-size:9px;font-weight:bold;"
+                + "'>" + letter + "</div>"
+
+        });
+
+        const marker = L.marker([w.lat, w.lng], { icon: icon });
+
+        const label = waterLabelText(w);
+
+        if (label) {
+
+            marker.bindTooltip(label, {
+                permanent: true,
+                direction: "right",
+                offset: [8, 0],
+                className: "suiri-label"
+            });
+
+        }
+
+        marker.bindPopup(
+            "<b>" + (w.id || "") + "</b><br>"
+            + w.type + "（" + (w.class || "") + "）<br>"
+            + (w.address || "")
+        );
+
+        marker.addTo(allWaterLayer);
+
+    });
+
+}
+
+/* ==========================================================
+   直近N件のハイライト表示
+   （大きめのアイコン＋順位番号＋口径・番号・T/P/Kラベル）
+========================================================== */
+
+function drawHighlight(list) {
+
+    highlightLayer.clearLayers();
 
     list.forEach(function (w, i) {
 
         const isTank = (w.type === "防火水槽");
 
-        const color = isTank ? "#2e7d32" : "#1976d2";
+        const color = isTank ? "#2e7d32" : "#d32f2f";
 
         const icon = L.divIcon({
 
             className: "",
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
 
             html:
                 "<div style='"
-                + "width:28px;height:28px;border-radius:50%;"
+                + "width:34px;height:34px;border-radius:50%;"
                 + "background:" + color + ";"
-                + "border:3px solid white;"
-                + "box-shadow:0 0 4px rgba(0,0,0,.7);"
+                + "border:4px solid #ffeb3b;"
+                + "box-shadow:0 0 8px rgba(0,0,0,.8);"
                 + "display:flex;align-items:center;justify-content:center;"
-                + "color:white;font-size:12px;font-weight:bold;"
+                + "color:white;font-size:15px;font-weight:bold;"
                 + "'>" + (i + 1) + "</div>"
 
         });
 
-        L.marker([w.lat, w.lng], { icon: icon })
+        const marker = L.marker([w.lat, w.lng], { icon: icon, zIndexOffset: 1000 });
 
-            .bindPopup(
-                "<b>" + (i + 1) + "位　" + w.id + "</b><br>"
-                + w.type + "（" + (w.class || "") + "）<br>"
-                + (w.address || "") + "<br>"
-                + "火点から " + Math.round(w.distance) + "m ・ " + w.direction
-            )
+        const labelParts = waterLabelParts(w);
 
-            .addTo(waterLayer);
+        const label = (i + 1) + "位 " + labelParts.join(" / ");
+
+        marker.bindTooltip(label, {
+            permanent: true,
+            direction: "right",
+            offset: [10, 0],
+            className: "suiri-label suiri-label-highlight"
+        });
+
+        marker.bindPopup(
+            "<b>" + (i + 1) + "位　" + w.id + "</b><br>"
+            + w.type + "（" + (w.class || "") + "）<br>"
+            + (w.address || "") + "<br>"
+            + "火点から " + Math.round(w.distance) + "m ・ " + w.direction
+        )
+
+            .addTo(highlightLayer);
 
     });
 

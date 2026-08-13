@@ -147,3 +147,26 @@ button:disabled {
 #radio {
   font-family: monospace;
 }
+
+/* ==========================================================
+   水利ラベル（地図上の常時表示ツールチップ）
+========================================================== */
+
+.suiri-label {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #999;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: none;
+}
+
+.suiri-label-highlight {
+  background: #fff3cd;
+  border: 2px solid #d32f2f;
+  color: #b71c1c;
+  font-size: 12px;
+  padding: 2px 7px;
+}
