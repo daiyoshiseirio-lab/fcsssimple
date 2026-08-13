@@ -365,7 +365,7 @@ function drawHighlight(list) {
 
         const labelParts = waterLabelParts(w);
 
-        const label = (i + 1) + "位 " + labelParts.join(" / ");
+        const label = labelParts.join(" / ");
 
         marker.bindTooltip(label, {
             permanent: true,
