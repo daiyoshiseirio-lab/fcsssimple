@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>火災メール連携 FCSS-Simple</title>
+
+<link rel="stylesheet" href="style.css?v=1">
+
+</head>
+
+<body>
+
+<header>
+
+<h1>📩 火災メール連携</h1>
+
+<p>メール本文を貼り付けると自動で検索画面を開きます</p>
+
+</header>
+
+<div class="container">
+
+<div class="card">
+
+<h2>手順</h2>
+
+<p style="font-size:13px; line-height:1.7; color:#555;">
+
+① 火災メールを開いて本文をコピー（全文でも、URL部分だけでも可）<br>
+
+② 下の欄に貼り付ける（貼り付けた瞬間に自動で開きます）<br>
+
+または「クリップボードから読み込む」ボタンでも同じことができます
+
+</p>
+
+<label>
+
+メール本文（またはURL）を貼り付け
+
+</label>
+
+<textarea id="mailText" rows="6" placeholder="ここに貼り付けてください"></textarea>
+
+<button id="clipboardBtn">クリップボードから読み込む</button>
+
+<div id="status" style="margin-top:14px; font-size:14px;"></div>
+
+</div>
+
+<div class="card">
+
+<h2>表示件数（自動で開く際の設定）</h2>
+
+<select id="topN">
+
+<option value="3">3件</option>
+
+<option value="5" selected>5件</option>
+
+<option value="8">8件</option>
+
+<option value="10">10件</option>
+
+</select>
+
+</div>
+
+</div>
+
+<script>
+
+function extractLatLng(text) {
+
+    // 主要パターン: query=lat,lng
+    let m = text.match(/query=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+    // 予備パターン: @lat,lng
+    m = text.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+    // 予備パターン: q=lat,lng または ll=lat,lng
+    m = text.match(/[?&](?:q|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+
+    return null;
+
+}
+
+function statusMsg(text, isError) {
+
+    const el = document.getElementById("status");
+
+    el.textContent = text;
+    el.style.color = isError ? "#c62828" : "#2e7d32";
+
+}
+
+function tryOpen(text) {
+
+    if (!text || text.trim() === "") {
+
+        return;
+
+    }
+
+    const coords = extractLatLng(text);
+
+    if (!coords) {
+
+        statusMsg("座標を含むGoogle MapリンクがURL内に見つかりませんでした。手動で座標や住所を確認してください。", true);
+
+        return;
+
+    }
+
+    const topN = document.getElementById("topN").value;
+
+    statusMsg(
+
+        "座標を検出しました（緯度" + coords.lat + " / 経度" + coords.lng + "）。検索画面を開きます…",
+        false
+
+    );
+
+    const url = "index.html?lat=" + coords.lat + "&lng=" + coords.lng + "&n=" + topN;
+
+    setTimeout(function () {
+
+        window.location.href = url;
+
+    }, 600);
+
+}
+
+const mailText = document.getElementById("mailText");
+
+mailText.addEventListener("input", function () {
+
+    tryOpen(mailText.value);
+
+});
+
+mailText.addEventListener("paste", function () {
+
+    // ペーストイベント発火直後はまだ値が反映されていないため少し待つ
+    setTimeout(function () {
+
+        tryOpen(mailText.value);
+
+    }, 50);
+
+});
+
+document.getElementById("clipboardBtn").addEventListener("click", async function () {
+
+    try {
+
+        const text = await navigator.clipboard.readText();
+
+        mailText.value = text;
+
+        tryOpen(text);
+
+    } catch (e) {
+
+        statusMsg("クリップボードを読み取れませんでした。上の欄に直接貼り付けてください。", true);
+
+    }
+
+});
+
+</script>
+
+</body>
+</html>
