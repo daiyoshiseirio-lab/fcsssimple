@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>住所→緯度経度 変換ツール（FCSS用）</title>
+<style>
+body{font-family:sans-serif;margin:0;padding:16px;background:#f5f5f5;color:#222}
+h1{font-size:18px;color:#0d47a1}
+p{font-size:13px;line-height:1.6}
+textarea{width:100%;box-sizing:border-box;height:160px;font-family:monospace;font-size:13px;padding:8px}
+button{padding:10px 18px;background:#1976d2;color:#fff;border:none;border-radius:6px;font-size:15px;margin:8px 0}
+button:disabled{background:#999}
+#out{white-space:pre;background:#fff;padding:10px;border:1px solid #ccc;overflow-x:auto;font-family:monospace;font-size:12px;min-height:60px}
+.note{background:#fff8e1;border-left:4px solid #ffb300;padding:8px 12px;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>住所 → 緯度経度 変換ツール</h1>
+
+<p>
+1行に1つずつ住所を貼り付けて「変換」を押すと、
+国土地理院の検索を使って緯度経度に変換します。<br>
+結果はCSVの <code>lat</code> / <code>lng</code> 欄にそのまま貼り付けられます。
+</p>
+
+<div class="note">
+変換できない住所は「変換失敗」と表示されます。
+その場合は番地を省く（○丁目まで）などで再試行してください。
+</div>
+
+<p>住所リスト（1行1件）</p>
+
+<textarea id="input" placeholder="兵庫県西宮市古川町2-12
+兵庫県西宮市松風町4-4"></textarea>
+
+<button id="run">変換</button>
+
+<p>結果</p>
+
+<div id="out">ここに結果が表示されます</div>
+
+<script>
+document.getElementById("run").onclick = async function(){
+
+    var btn = this;
+    var lines = document.getElementById("input").value
+                .split("\n")
+                .map(function(s){ return s.trim(); })
+                .filter(function(s){ return s !== ""; });
+
+    if(lines.length === 0){
+        alert("住所を入力してください");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerText = "変換中...";
+
+    var out = document.getElementById("out");
+    out.textContent = "address,lat,lng\n";
+
+    for(var i=0;i<lines.length;i++){
+
+        var addr = lines[i];
+
+        try{
+            var url = "https://msearch.gsi.go.jp/address-search/AddressSearch?q="
+                      + encodeURIComponent(addr);
+            var res = await fetch(url);
+            var json = await res.json();
+
+            if(json.length === 0){
+                out.textContent += addr + ",変換失敗,変換失敗\n";
+            }else{
+                var lng = json[0].geometry.coordinates[0];
+                var lat = json[0].geometry.coordinates[1];
+                out.textContent += addr + "," + lat.toFixed(6) + "," + lng.toFixed(6) + "\n";
+            }
+        }catch(e){
+            out.textContent += addr + ",エラー,エラー\n";
+        }
+
+        /* 連続アクセスを避けるため少し待つ */
+        await new Promise(function(r){ setTimeout(r,400); });
+    }
+
+    btn.disabled = false;
+    btn.innerText = "変換";
+};
+</script>
+
+</body>
+</html>

@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>水利登録ツール</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  :root {
+    --ink: #1c2530;
+    --paper: #f5f3ee;
+    --line: #d8d3c8;
+    --accent: #b3441e;
+    --accent-dim: #8a3517;
+    --ok: #2f6b45;
+    --panel: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic", -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000;
+    flex-shrink: 0;
+  }
+  header .title { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+  header .count { font-size: 12px; opacity: 0.75; }
+  #map {
+    flex: 1;
+    min-height: 0;
+  }
+  .leaflet-container { background: #e5e1d6; }
+
+  /* Bottom toolbar */
+  #toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  #toolbar button {
+    flex: 1;
+    padding: 10px 4px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 6px;
+    color: var(--ink);
+  }
+  #toolbar button.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  /* Locate control (custom Leaflet button) */
+  .locate-btn {
+    background: #fff;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .locate-btn svg { width: 20px; height: 20px; }
+  .locate-btn.active svg { color: var(--accent); }
+  .locate-btn svg { color: #444; }
+
+  /* Modal form */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(20,16,10,0.45);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 2000;
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    background: var(--panel);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 14px 14px 0 0;
+    padding: 16px 18px 20px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .sheet h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+  }
+  .sheet .coord {
+    font-size: 11px;
+    color: #777;
+    margin-bottom: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 5px;
+  }
+  .seg {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .seg button {
+    flex: 1;
+    padding: 10px 4px;
+    border: none;
+    background: var(--panel);
+    font-size: 13px;
+    color: var(--ink);
+    border-right: 1px solid var(--line);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--ink); color: #fff; }
+  .seg button.active.pk-T { background: var(--ok); }
+  .seg button.active.pk-P { background: #c07a10; }
+  .seg button.active.pk-K { background: #999; }
+
+  .compass-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .compass-grid button {
+    padding: 9px 2px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  .compass-grid button.active {
+    background: var(--accent-dim);
+    color: #fff;
+    border-color: var(--accent-dim);
+  }
+
+  input[type=text], input[type=number], select {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .row2 { display: flex; gap: 8px; }
+  .row2 > div { flex: 1; }
+
+  .sheet-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .sheet-actions button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+  }
+  .sheet-actions button.save { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .sheet-actions button.delete { color: var(--accent-dim); }
+
+  #toast {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--ink);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 3000;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .divIcon-marker {
+    width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .divIcon-label {
+    transform: rotate(45deg);
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 18px;
+    text-align: center;
+  }
+  .leaflet-tooltip.suiri-label {
+    background: rgba(28,37,48,0.88);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    box-shadow: none;
+    white-space: nowrap;
+  }
+  .leaflet-tooltip.suiri-label::before { border: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">水利登録ツール</div>
+  <div class="count"><span id="markerCount">0</span> 件登録</div>
+</header>
+
+<div id="map"></div>
+
+<div id="toolbar">
+  <button id="exportBtn">CSV書き出し</button>
+  <button id="exportFcssBtn" class="primary">FCSS用に書き出し</button>
+  <button id="syncBtn">最新を読み込む</button>
+  <button id="importBtn">CSV読み込み</button>
+  <button id="clearAllBtn">全削除</button>
+</div>
+<input type="file" id="importFile" accept=".csv" style="display:none;">
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2 id="sheetTitle">水利を登録</h2>
+    <div class="coord" id="sheetCoord"></div>
+
+    <div class="field">
+      <label>種別</label>
+      <div class="seg" id="typeSeg">
+        <button data-val="消火栓" class="active">消火栓</button>
+        <button data-val="防火水槽">防火水槽</button>
+        <button data-val="その他">その他</button>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label id="kokeiLabel">口径 (mm)</label>
+        <input type="text" id="kokei" list="kokeiOptions" placeholder="例: 150" inputmode="numeric">
+        <datalist id="kokeiOptions">
+          <option value="75"></option>
+          <option value="100"></option>
+          <option value="150"></option>
+          <option value="200"></option>
+          <option value="300"></option>
+        </datalist>
+      </div>
+      <div class="field">
+        <label>部署区分</label>
+        <div class="seg" id="pkSeg">
+          <button data-val="T" class="pk-T">T</button>
+          <button data-val="P" class="pk-P">P</button>
+          <button data-val="K" class="pk-K">K</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>水利番号（任意）</label>
+      <input type="text" id="bangou" placeholder="例: 第123号">
+    </div>
+
+    <div class="field">
+      <label>設置区分</label>
+      <div class="seg" id="koushiSeg">
+        <button data-val="公設" class="active">公設</button>
+        <button data-val="私設">私設</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>進入不可方向（最大3方向・未選択なら制限なし）</label>
+      <div class="compass-grid" id="dirGrid">
+        <button data-val="北">北</button>
+        <button data-val="北東">北東</button>
+        <button data-val="東">東</button>
+        <button data-val="南東">南東</button>
+        <button data-val="南">南</button>
+        <button data-val="南西">南西</button>
+        <button data-val="西">西</button>
+        <button data-val="北西">北西</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>メモ（任意）</label>
+      <input type="text" id="memo" placeholder="例: 道が狭く南からのみ進入可">
+    </div>
+
+    <div class="sheet-actions">
+      <button id="cancelBtn">キャンセル</button>
+      <button class="delete" id="deleteBtn" style="display:none;">削除</button>
+      <button class="save" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ---------- Map setup ----------
+// GSI 標準地図 (native zoom up to 18). maxZoom set beyond native so Leaflet
+// upsamples tiles, letting the user keep pinching in for fine placement.
+const map = L.map('map', {
+  zoomControl: true,
+  maxZoom: 22,
+}).setView([34.6937, 135.5023], 16); // fallback: roughly Osaka area
+
+const tileLayer = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+  attribution: '地図: 国土地理院',
+  maxZoom: 22,
+  maxNativeZoom: 18,
+}).addTo(map);
+
+let tileErrorCount = 0;
+let fallbackApplied = false;
+tileLayer.on('tileerror', () => {
+  tileErrorCount++;
+  if (!fallbackApplied && tileErrorCount >= 3) {
+    fallbackApplied = true;
+    map.removeLayer(tileLayer);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '地図: OpenStreetMap contributors',
+      maxZoom: 22,
+      maxNativeZoom: 19,
+    }).addTo(map);
+    showToast('国土地理院の地図が読み込めないため、別の地図に切り替えました');
+  }
+});
+
+// ---------- Locate ("現在地") control ----------
+let locateMarker = null;
+let locateCircle = null;
+let watchId = null;
+let hasCenteredOnLocate = false;
+
+const locateIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>`;
+
+const LocateControl = L.Control.extend({
+  options: { position: 'topright' },
+  onAdd: function() {
+    const container = L.DomUtil.create('div', 'leaflet-bar');
+    const btn = L.DomUtil.create('a', 'locate-btn', container);
+    btn.href = '#';
+    btn.title = '現在地を表示';
+    btn.innerHTML = locateIconSvg;
+    L.DomEvent.disableClickPropagation(btn);
+    L.DomEvent.on(btn, 'click', (e) => {
+      L.DomEvent.preventDefault(e);
+      toggleLocate(btn);
+    });
+    this._btn = btn;
+    return container;
+  }
+});
+const locateControl = new LocateControl();
+map.addControl(locateControl);
+
+function toggleLocate(btn) {
+  if (watchId !== null) {
+    // Already tracking — just re-center
+    if (locateMarker) {
+      map.setView(locateMarker.getLatLng(), Math.max(map.getZoom(), 17));
+    }
+    return;
+  }
+  if (!navigator.geolocation) {
+    showToast('この端末では位置情報が使えません');
+    return;
+  }
+  btn.classList.add('active');
+  showToast('現在地を取得中…');
+  hasCenteredOnLocate = false;
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const latlng = [pos.coords.latitude, pos.coords.longitude];
+      if (!locateMarker) {
+        locateMarker = L.circleMarker(latlng, {
+          radius: 8, color: '#fff', weight: 2,
+          fillColor: '#1a73e8', fillOpacity: 1
+        }).addTo(map);
+        locateCircle = L.circle(latlng, {
+          radius: pos.coords.accuracy || 20,
+          color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12
+        }).addTo(map);
+      } else {
+        locateMarker.setLatLng(latlng);
+        locateCircle.setLatLng(latlng);
+        locateCircle.setRadius(pos.coords.accuracy || 20);
+      }
+      if (!hasCenteredOnLocate) {
+        map.setView(latlng, 17);
+        hasCenteredOnLocate = true;
+        showToast('現在地を表示しました');
+      }
+    },
+    (err) => {
+      btn.classList.remove('active');
+      watchId = null;
+      if (err.code === err.PERMISSION_DENIED) {
+        showToast('位置情報の利用が許可されていません（設定をご確認ください）');
+      } else {
+        showToast('現在地を取得できませんでした');
+      }
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+// ---------- State ----------
+let markers = []; // { id, lat, lng, type, kokei, pk, memo, leafletMarker }
+let editingId = null;
+let pendingLatLng = null;
+
+const STORAGE_KEY = 'suiri-points';
+
+const ALL_DIRECTIONS = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+
+function oppositeDirection(dir) {
+  const i = ALL_DIRECTIONS.indexOf(dir);
+  if (i === -1) return null;
+  return ALL_DIRECTIONS[(i + 4) % 8]; // 8方位なので+4で正反対
+}
+
+function pkColor(pk) {
+  if (pk === 'T') return '#2f6b45';
+  if (pk === 'P') return '#c07a10';
+  if (pk === 'K') return '#999999';
+  return '#555';
+}
+
+function makeIcon(pk, type) {
+  const label = type === '防火水槽' ? '水槽' : (pk || '?');
+  return L.divIcon({
+    className: '',
+    html: `<div class="divIcon-marker" style="background:${pkColor(pk)}"><div class="divIcon-label">${label}</div></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 22],
+  });
+}
+
+function makeTooltipText(d) {
+  const parts = [];
+  if (d.bangou) parts.push(d.bangou);
+  if (d.kokei) parts.push(d.kokei + (d.type === '防火水槽' ? 't' : 'mm'));
+  return parts.join(' / ');
+}
+
+function updateCount() {
+  document.getElementById('markerCount').textContent = markers.length;
+}
+
+function showToast(msg, duration = 1600) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ---------- Persistence (cross-session, this device's browser) ----------
+function loadMarkers() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      data.forEach(d => addMarkerToMap(d, false));
+      updateCount();
+    }
+  } catch (e) {
+    // no data yet, or storage unavailable — start empty
+    console.log('No saved data found, starting fresh.');
+  }
+}
+
+function persist() {
+  try {
+    const data = markers.map(m => ({
+      id: m.id, lat: m.lat, lng: m.lng,
+      type: m.type, kokei: m.kokei, bangou: m.bangou, koushi: m.koushi, pk: m.pk,
+      blockedDirections: m.blockedDirections, memo: m.memo
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Save failed', e);
+    showToast('保存に失敗しました（端末の空き容量をご確認ください）');
+  }
+}
+
+// ---------- Marker management ----------
+function addMarkerToMap(d, doPersist = true) {
+  const lm = L.marker([d.lat, d.lng], {
+    icon: makeIcon(d.pk, d.type),
+    draggable: true
+  }).addTo(map);
+  const record = { ...d, leafletMarker: lm };
+  const tooltipText = makeTooltipText(d);
+  if (tooltipText) {
+    lm.bindTooltip(tooltipText, {
+      permanent: true, direction: 'right', offset: [8, -10],
+      className: 'suiri-label'
+    });
+  }
+  lm.on('click', (e) => {
+    L.DomEvent.stopPropagation(e);
+    openSheetForEdit(record);
+  });
+  lm.on('dragend', () => {
+    const pos = lm.getLatLng();
+    record.lat = pos.lat;
+    record.lng = pos.lng;
+    persist();
+    showToast('位置を更新しました');
+  });
+  markers.push(record);
+  updateCount();
+  if (doPersist) persist();
+  return record;
+}
+
+function removeMarker(id) {
+  const idx = markers.findIndex(m => m.id === id);
+  if (idx === -1) return;
+  map.removeLayer(markers[idx].leafletMarker);
+  markers.splice(idx, 1);
+  updateCount();
+  persist();
+}
+
+// ---------- Form sheet ----------
+const overlay = document.getElementById('overlay');
+const typeSeg = document.getElementById('typeSeg');
+const pkSeg = document.getElementById('pkSeg');
+const kokeiInput = document.getElementById('kokei');
+const bangouInput = document.getElementById('bangou');
+const memoInput = document.getElementById('memo');
+const deleteBtn = document.getElementById('deleteBtn');
+const sheetCoord = document.getElementById('sheetCoord');
+const sheetTitle = document.getElementById('sheetTitle');
+
+function setSeg(container, val) {
+  [...container.children].forEach(b => b.classList.toggle('active', b.dataset.val === val));
+}
+function getSeg(container) {
+  const active = container.querySelector('.active');
+  return active ? active.dataset.val : null;
+}
+typeSeg.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') {
+    setSeg(typeSeg, e.target.dataset.val);
+    updateKokeiFieldForType(e.target.dataset.val);
+  }
+});
+
+const kokeiLabel = document.getElementById('kokeiLabel');
+const kokeiOptions = document.getElementById('kokeiOptions');
+const HYDRANT_KOKEI = ['75', '100', '150', '200', '300'];
+const TANK_SUIRYOU = ['20', '40', '80', '100', '150', '200'];
+
+function updateKokeiFieldForType(type) {
+  const isTank = (type === '防火水槽');
+  kokeiLabel.textContent = isTank ? '水量 (t)' : '口径 (mm)';
+  kokeiInput.placeholder = isTank ? '例: 40' : '例: 150';
+  const values = isTank ? TANK_SUIRYOU : HYDRANT_KOKEI;
+  kokeiOptions.innerHTML = values.map(v => `<option value="${v}"></option>`).join('');
+}
+
+pkSeg.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') setSeg(pkSeg, e.target.dataset.val);
+});
+const koushiSeg = document.getElementById('koushiSeg');
+koushiSeg.addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') setSeg(koushiSeg, e.target.dataset.val);
+});
+
+const dirGrid = document.getElementById('dirGrid');
+dirGrid.addEventListener('click', e => {
+  if (e.target.tagName !== 'BUTTON') return;
+  const btn = e.target;
+  if (btn.classList.contains('active')) {
+    btn.classList.remove('active');
+    return;
+  }
+  const activeCount = dirGrid.querySelectorAll('button.active').length;
+  if (activeCount >= 3) {
+    showToast('進入不可方向は最大3方向までです');
+    return;
+  }
+  btn.classList.add('active');
+});
+function setDirGrid(vals) {
+  const set = new Set(vals || []);
+  [...dirGrid.children].forEach(b => b.classList.toggle('active', set.has(b.dataset.val)));
+}
+function getDirGrid() {
+  return [...dirGrid.querySelectorAll('button.active')].map(b => b.dataset.val);
+}
+
+function openSheetForNew(latlng) {
+  editingId = null;
+  pendingLatLng = latlng;
+  sheetTitle.textContent = '水利を登録';
+  sheetCoord.textContent = `緯度 ${latlng.lat.toFixed(6)} / 経度 ${latlng.lng.toFixed(6)}`;
+  setSeg(typeSeg, '消火栓');
+  setSeg(pkSeg, 'T');
+  setSeg(koushiSeg, '公設');
+  updateKokeiFieldForType('消火栓');
+  kokeiInput.value = '';
+  bangouInput.value = '';
+  setDirGrid([]);
+  memoInput.value = '';
+  deleteBtn.style.display = 'none';
+  overlay.classList.add('show');
+}
+
+function openSheetForEdit(record) {
+  editingId = record.id;
+  pendingLatLng = { lat: record.lat, lng: record.lng };
+  sheetTitle.textContent = '水利を編集';
+  sheetCoord.textContent = `緯度 ${record.lat.toFixed(6)} / 経度 ${record.lng.toFixed(6)}`;
+  setSeg(typeSeg, record.type || '消火栓');
+  setSeg(pkSeg, record.pk || 'T');
+  setSeg(koushiSeg, record.koushi || '公設');
+  updateKokeiFieldForType(record.type || '消火栓');
+  kokeiInput.value = record.kokei || '';
+  bangouInput.value = record.bangou || '';
+  setDirGrid(record.blockedDirections || []);
+  memoInput.value = record.memo || '';
+  deleteBtn.style.display = 'block';
+  overlay.classList.add('show');
+}
+
+function closeSheet() {
+  overlay.classList.remove('show');
+  editingId = null;
+  pendingLatLng = null;
+}
+
+document.getElementById('cancelBtn').addEventListener('click', closeSheet);
+overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSheet(); });
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const type = getSeg(typeSeg);
+  const pk = getSeg(pkSeg);
+  const kokei = kokeiInput.value.trim();
+  const bangou = bangouInput.value.trim();
+  const koushi = getSeg(koushiSeg);
+  const blockedDirections = getDirGrid();
+  const memo = memoInput.value.trim();
+
+  /* 同じ種別(消火栓/防火水槽/その他)内で水利番号の重複をチェック。
+     未入力(空欄)は対象外。編集中の自分自身は除く。 */
+  if (bangou !== '') {
+    const dup = markers.find(m =>
+      m.id !== editingId &&
+      m.type === type &&
+      (m.bangou || '').trim() === bangou
+    );
+    if (dup) {
+      showToast(`水利番号「${bangou}」は同じ種別（${type}）で既に使われています`, 3200);
+      return;
+    }
+  }
+
+  if (editingId) {
+    const record = markers.find(m => m.id === editingId);
+    record.type = type; record.pk = pk; record.kokei = kokei; record.bangou = bangou; record.koushi = koushi; record.blockedDirections = blockedDirections; record.memo = memo;
+    record.leafletMarker.setIcon(makeIcon(pk, type));
+    const tooltipText = makeTooltipText(record);
+    if (tooltipText) {
+      record.leafletMarker.unbindTooltip();
+      record.leafletMarker.bindTooltip(tooltipText, {
+        permanent: true, direction: 'right', offset: [8, -10],
+        className: 'suiri-label'
+      });
+    } else {
+      record.leafletMarker.unbindTooltip();
+    }
+    persist();
+    showToast('更新しました');
+  } else {
+    addMarkerToMap({
+      id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+      lat: pendingLatLng.lat, lng: pendingLatLng.lng,
+      type, kokei, bangou, koushi, pk, blockedDirections, memo
+    });
+    showToast('登録しました');
+  }
+  closeSheet();
+});
+
+deleteBtn.addEventListener('click', () => {
+  if (editingId) {
+    removeMarker(editingId);
+    showToast('削除しました');
+  }
+  closeSheet();
+});
+
+// Tap on map = new point
+map.on('click', (e) => {
+  openSheetForNew(e.latlng);
+});
+
+// ---------- Toolbar actions ----------
+document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('importFile').click();
+});
+
+// Simple CSV parser that handles quoted fields
+function parseLine(line) {
+  const out = [];
+  let cur = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { cur += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { out.push(cur); cur = ''; }
+      else cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+/* CSVテキストを解析してマーカーとして読み込む共通処理。
+   ファイル選択・サーバーからのfetchの両方から呼び出す。
+   戻り値：読み込んだ件数 */
+function importCsvText(text) {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length < 2) { return 0; }
+
+  const header = parseLine(lines[0]).map(h => h.trim());
+  const idx = (name) => header.indexOf(name);
+
+  // FCSS(suiri.csv)形式かどうかを判定（class列があればFCSS形式とみなす）
+  const isFcssFormat = idx('class') >= 0;
+
+  let imported = 0;
+
+  if (isFcssFormat) {
+    // ---- FCSS(suiri.csv)形式の読み込み ----
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseLine(lines[i]);
+      const lat = parseFloat(cols[idx('lat')]);
+      const lng = parseFloat(cols[idx('lng')]);
+      if (isNaN(lat) || isNaN(lng)) continue;
+
+      const type = idx('type') >= 0 ? cols[idx('type')] : '消火栓';
+      const isTank = (type === '防火水槽');
+      const diameter = idx('diameter') >= 0 ? cols[idx('diameter')] : '';
+      const capacity = idx('capacity') >= 0 ? cols[idx('capacity')] : '';
+      const kokei = isTank ? capacity : diameter;
+
+      // access_from(火点起点の許可方向)を、この画面のblockedDirections
+      // (水利起点の進入不可方向)に変換。180度反転が必要（上のoppositeDirection参照）
+      const accessFrom = idx('access_from') >= 0 ? cols[idx('access_from')] : '';
+      let blockedDirections = [];
+      if (accessFrom && accessFrom.trim() !== '') {
+        const allowedFromFireSide = new Set(
+          accessFrom.split(',').map(s => s.split(':')[0].trim()).filter(Boolean)
+        );
+        // 火点側で許可されていない方角 → 反転して水利側の「行けない方角」に
+        blockedDirections = ALL_DIRECTIONS
+          .filter(d => !allowedFromFireSide.has(d))
+          .map(oppositeDirection)
+          .filter(Boolean)
+          .slice(0, 3);
+      }
+
+      addMarkerToMap({
+        id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 100000) + '_' + i,
+        lat, lng,
+        type,
+        kokei,
+        bangou: idx('id') >= 0 ? cols[idx('id')] : '',
+        koushi: '',
+        pk: idx('class') >= 0 ? cols[idx('class')] : '',
+        blockedDirections,
+        memo: idx('memo') >= 0 ? cols[idx('memo')] : '',
+      }, false);
+      imported++;
+    }
+  } else {
+    // ---- この画面独自形式の読み込み ----
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseLine(lines[i]);
+      const lat = parseFloat(cols[idx('lat')]);
+      const lng = parseFloat(cols[idx('lng')]);
+      if (isNaN(lat) || isNaN(lng)) continue;
+      addMarkerToMap({
+        id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 100000) + '_' + i,
+        lat, lng,
+        type: idx('type') >= 0 ? cols[idx('type')] : '',
+        kokei: idx('kokei') >= 0 ? cols[idx('kokei')] : '',
+        bangou: idx('bangou') >= 0 ? cols[idx('bangou')] : '',
+        koushi: idx('koushi') >= 0 ? cols[idx('koushi')] : '',
+        pk: idx('pk') >= 0 ? cols[idx('pk')] : '',
+        blockedDirections: idx('blockedDirections') >= 0 && cols[idx('blockedDirections')]
+          ? cols[idx('blockedDirections')].split('/').filter(Boolean) : [],
+        memo: idx('memo') >= 0 ? cols[idx('memo')] : '',
+      }, false);
+      imported++;
+    }
+  }
+
+  return imported;
+}
+
+document.getElementById('importFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const imported = importCsvText(text);
+  if (imported === 0) {
+    showToast('データが見つかりませんでした');
+  } else {
+    persist();
+    showToast(`${imported}件を読み込みました`);
+  }
+  e.target.value = '';
+});
+
+/* ---------- サーバー(同じリポジトリ内)のsuiri.csvから最新を取得 ----------
+   PC側で「FCSS用に書き出し」→ GitHubへアップロード、を済ませておけば、
+   このボタンでスマホ側にも最新データを取り込める。
+   完全自動の同期ではなく、PC側のアップロード操作は引き続き必要。 */
+document.getElementById('syncBtn').addEventListener('click', async () => {
+  if (markers.length > 0) {
+    const ok = confirm(
+      '現在この画面にある' + markers.length + '件のデータを消去して、\n' +
+      'このリポジトリの最新suiri.csvを読み込みます。\n\n' +
+      'この端末でまだ書き出し・アップロードしていない変更があれば失われます。\n' +
+      '続けますか？'
+    );
+    if (!ok) return;
+  }
+
+  try {
+    const res = await fetch('suiri.csv', { cache: 'no-store' });
+    if (!res.ok) {
+      throw new Error('suiri.csvの取得に失敗しました（' + res.status + '）');
+    }
+    const text = await res.text();
+
+    // 現在の表示をクリアしてから読み込む
+    markers.forEach(m => map.removeLayer(m.leafletMarker));
+    markers = [];
+
+    const imported = importCsvText(text);
+    persist();
+    updateCount();
+    showToast(`最新データを読み込みました（${imported}件）`);
+  } catch (err) {
+    console.error(err);
+    showToast('読み込みに失敗しました。suiri.csvが同じ場所にあるか確認してください', 3200);
+  }
+});
+
+document.getElementById('clearAllBtn').addEventListener('click', async () => {
+  if (markers.length === 0) return;
+  if (!confirm(`登録済みの${markers.length}件をすべて削除しますか？`)) return;
+  markers.forEach(m => map.removeLayer(m.leafletMarker));
+  markers = [];
+  updateCount();
+  await persist();
+  showToast('全件削除しました');
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (markers.length === 0) {
+    showToast('登録データがありません');
+    return;
+  }
+  const header = 'id,lat,lng,type,kokei,bangou,koushi,pk,blockedDirections,memo\n';
+  const rows = markers.map(m => {
+    const esc = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    return [m.id, m.lat, m.lng, esc(m.type), esc(m.kokei), esc(m.bangou), esc(m.koushi), esc(m.pk), esc((m.blockedDirections || []).join('/')), esc(m.memo)].join(',');
+  });
+  const csv = header + rows.join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'suiri_points.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSVを書き出しました');
+});
+
+// ---------- FCSS(suiri.csv)形式への変換書き出し ----------
+// ALL_DIRECTIONS / oppositeDirection はファイル冒頭のState定義部で定義済み
+
+/* blockedDirectionsは「水利からその方角へホースを延ばせない」という
+   水利起点の情報。access_fromは「火点から見て水利がどちらにあれば
+   使用可か」という火点起点の情報なので、変換には180度反転が必要。
+   例：水利から見て西に行けない(blockedDirections=['西'])
+       → 火点が水利の西側にある状況が使用不可
+       → 火点から見ると水利は東にある
+       → access_fromから「東」を除外する */
+function blockedToAccessFrom(blockedDirections) {
+  if (!blockedDirections || blockedDirections.length === 0) {
+    return ''; // 進入不可方向の指定なし = 制限なし
+  }
+  const excludedFromFireSide = blockedDirections
+    .map(oppositeDirection)
+    .filter(Boolean);
+  const excludedSet = new Set(excludedFromFireSide);
+  const allowed = ALL_DIRECTIONS.filter(d => !excludedSet.has(d));
+  // 全方位がブロックされることは実運用上ないはずだが念のため
+  if (allowed.length === 0) {
+    return '';
+  }
+  return allowed.join(',');
+}
+
+document.getElementById('exportFcssBtn').addEventListener('click', () => {
+  if (markers.length === 0) {
+    showToast('登録データがありません');
+    return;
+  }
+  const header = 'id,type,address,lat,lng,side,diameter,class,capacity,road,memo,access_from,blocked\n';
+  const rows = markers.map((m, i) => {
+    const esc = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const isTank = (m.type === '防火水槽');
+    const id = (m.bangou && m.bangou.trim() !== '') ? m.bangou.trim() : ('NOID_' + (i + 1));
+    const diameter = isTank ? '0' : (m.kokei || '');
+    const capacity = isTank ? (m.kokei || '') : '0';
+    const memoParts = [];
+    if (m.koushi) memoParts.push(m.koushi);
+    if (m.memo) memoParts.push(m.memo);
+    const memo = memoParts.join(' ');
+    const accessFrom = blockedToAccessFrom(m.blockedDirections);
+
+    return [
+      esc(id), esc(m.type), '', m.lat, m.lng, '',
+      diameter, esc(m.pk || ''), capacity, '',
+      esc(memo), esc(accessFrom), ''
+    ].join(',');
+  });
+  const csv = header + rows.join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'suiri.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('suiri.csv形式で書き出しました');
+});
+
+// ---------- Init ----------
+loadMarkers();
+</script>
+</body>
+</html>
