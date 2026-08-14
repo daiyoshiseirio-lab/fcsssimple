@@ -18,7 +18,12 @@ window.onload = function () {
     searchBtn.disabled = true;
     searchBtn.innerText = "水利データ読込中...";
 
-    loadSuiriData().then(function () {
+    Promise.all([
+
+        loadSuiriData(),
+        loadStationData()
+
+    ]).then(function () {
 
         searchBtn.disabled = false;
         searchBtn.innerText = "検索";
@@ -227,6 +232,74 @@ function runSearch(lat, lng) {
     drawHighlight(nearest);
 
     renderList(nearest);
+
+    /* 消防署一覧（地図マーカーなし、文字情報のみ） */
+
+    const nearestStations = getNearestStations(lat, lng, topN);
+
+    renderStationList(nearestStations);
+
+}
+
+/* ==========================================================
+   消防署一覧の描画（文字情報のみ）
+========================================================== */
+
+function renderStationList(list) {
+
+    const box = document.getElementById("stationList");
+
+    if (!box) {
+
+        return;
+
+    }
+
+    if (list.length === 0) {
+
+        box.innerHTML = "消防署データが登録されていません";
+
+        return;
+
+    }
+
+    let html = "";
+
+    list.forEach(function (s, i) {
+
+        html += `
+
+        <div class="unit">
+
+            <div class="unitNo">${i + 1}</div>
+
+            <div class="unitBody">
+
+                <div>
+
+                    <strong>${s.name || s.id || ""}</strong>
+
+                </div>
+
+                <div>${s.address || ""}</div>
+
+                <div>
+
+                    火点から直線約 ${Math.round(s.distance)}m
+
+                    ${s.memo ? "・" + s.memo : ""}
+
+                </div>
+
+            </div>
+
+        </div>
+
+        `;
+
+    });
+
+    box.innerHTML = html;
 
 }
 
