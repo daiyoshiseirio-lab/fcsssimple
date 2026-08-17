@@ -13,6 +13,8 @@ window.onload = function () {
 
     initMap();
 
+    initTabs();
+
     const searchBtn = document.getElementById("searchButton");
 
     searchBtn.disabled = true;
@@ -130,16 +132,114 @@ async function searchAddress() {
 }
 
 /* ==========================================================
-   地図クリックでも検索
+   タブ切り替え（地図・近隣水利一覧・近隣消防署一覧）
+   Excelのシートタブのように、1つずつ切り替えて表示する
 ========================================================== */
+
+function initTabs() {
+
+    const tabBtns = document.querySelectorAll(".tab-btn");
+
+    tabBtns.forEach(function (btn) {
+
+        btn.addEventListener("click", function () {
+
+            const target = btn.dataset.tab;
+
+            document.querySelectorAll(".tab-btn").forEach(function (b) {
+
+                b.classList.toggle("active", b === btn);
+
+            });
+
+            document.querySelectorAll(".tab-panel").forEach(function (panel) {
+
+                panel.classList.toggle("active", panel.id === "tabPanel-" + target);
+
+            });
+
+            /* 地図タブに切り替えたときは、非表示中にずれたサイズを再計算する */
+
+            if (target === "map" && map) {
+
+                setTimeout(function () {
+
+                    map.invalidateSize();
+
+                }, 50);
+
+            }
+
+        });
+
+    });
+
+}
+
+/* ==========================================================
+   地図タップで火点指定（誤操作防止のため単発モード）
+   「地図タップで火点指定」ボタンを押した直後の1回だけ、
+   地図タップが火点移動として反応する。それ以外の閲覧中の
+   タップ（誤操作や、水利を確認するための操作）では反応しない。
+========================================================== */
+
+let mapClickArmed = false;
 
 function enableMapClick() {
 
     map.on("click", function (e) {
 
+        if (!mapClickArmed) {
+
+            return;
+
+        }
+
+        mapClickArmed = false;
+
+        updateArmButton();
+
         runSearch(e.latlng.lat, e.latlng.lng);
 
     });
+
+    const armBtn = document.getElementById("armMapClickBtn");
+
+    if (armBtn) {
+
+        armBtn.addEventListener("click", function () {
+
+            mapClickArmed = !mapClickArmed;
+
+            updateArmButton();
+
+        });
+
+    }
+
+}
+
+function updateArmButton() {
+
+    const armBtn = document.getElementById("armMapClickBtn");
+
+    if (!armBtn) {
+
+        return;
+
+    }
+
+    if (mapClickArmed) {
+
+        armBtn.textContent = "📍 地図をタップして火点を指定（有効）";
+        armBtn.classList.add("active");
+
+    } else {
+
+        armBtn.textContent = "📍 地図タップで火点を指定する";
+        armBtn.classList.remove("active");
+
+    }
 
 }
 

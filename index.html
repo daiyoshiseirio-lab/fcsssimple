@@ -63,17 +63,23 @@ placeholder="住所を入力してください">
 
 </div>
 
-<div class="card">
+<div class="card tab-card">
 
-<h2>地図</h2>
+<div id="tabBar" class="tab-bar">
+<button class="tab-btn active" data-tab="map">地図</button>
+<button class="tab-btn" data-tab="water">近隣水利一覧</button>
+<button class="tab-btn" data-tab="station">近隣消防署一覧（直線距離順）</button>
+</div>
+
+<div id="tabPanel-map" class="tab-panel active">
+
+<button id="armMapClickBtn">📍 地図タップで火点を指定する</button>
 
 <div id="map"></div>
 
 </div>
 
-<div class="card">
-
-<h2>近隣水利一覧</h2>
+<div id="tabPanel-water" class="tab-panel">
 
 <div id="resultList">
 
@@ -83,13 +89,15 @@ placeholder="住所を入力してください">
 
 </div>
 
-<div class="card">
-
-<h2>近隣消防署一覧（直線距離・参考値）</h2>
+<div id="tabPanel-station" class="tab-panel">
 
 <div id="stationList">
 
 住所を入力してください
+
+</div>
+
+</div>
 
 </div>
 
