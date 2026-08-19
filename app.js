@@ -306,7 +306,13 @@ function showFire(lat, lng) {
 
     fireMarker = L.marker([lat, lng], { icon: fireIcon })
         .addTo(map)
-        .bindPopup("火点")
+        .bindPopup(
+            "火点<br>"
+            + "<a href='" + googleMapsNavUrl(lat, lng) + "' target='_blank' "
+            + "style='display:inline-block;margin-top:6px;padding:5px 10px;"
+            + "background:#1976d2;color:#fff;border-radius:5px;text-decoration:none;font-size:12px;'>"
+            + "🧭 Googleマップでナビ</a>"
+        )
         .openPopup();
 
     map.setView([lat, lng], 18);
