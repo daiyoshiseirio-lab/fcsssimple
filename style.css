@@ -229,3 +229,23 @@ button:disabled {
   color: #fff;
   border-color: #d32f2f;
 }
+
+/* ==========================================================
+   Googleマップナビリンク（一覧側）
+========================================================== */
+
+.nav-link {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: #1976d2;
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.nav-link:active {
+  background: #1565c0;
+}

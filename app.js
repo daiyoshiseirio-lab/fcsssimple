@@ -552,11 +552,29 @@ function drawHighlight(list) {
             + w.type + "（" + (w.class || "") + "）<br>"
             + (w.address || "") + "<br>"
             + "火点から " + Math.round(w.distance) + "m ・ " + w.direction
+            + "<br>"
+            + "<a href='" + googleMapsNavUrl(w.lat, w.lng) + "' target='_blank' "
+            + "style='display:inline-block;margin-top:6px;padding:5px 10px;"
+            + "background:#1976d2;color:#fff;border-radius:5px;text-decoration:none;font-size:12px;'>"
+            + "🧭 Googleマップでナビ</a>"
         )
 
             .addTo(highlightLayer);
 
     });
+
+}
+
+/* ==========================================================
+   Googleマップのナビ（経路案内）URLを組み立てる
+   iOS/Android/PCいずれでも、インストール済みならアプリが、
+   なければブラウザ版Googleマップが開く汎用形式
+========================================================== */
+
+function googleMapsNavUrl(lat, lng) {
+
+    return "https://www.google.com/maps/dir/?api=1&destination="
+        + lat + "," + lng + "&travelmode=driving";
 
 }
 
@@ -597,6 +615,16 @@ function renderList(list) {
                 <div>
 
                     火点から ${Math.round(w.distance)}m ・ ${w.direction}
+
+                </div>
+
+                <div>
+
+                    <a href="${googleMapsNavUrl(w.lat, w.lng)}" target="_blank" class="nav-link">
+
+                        🧭 Googleマップでナビ
+
+                    </a>
 
                 </div>
 
